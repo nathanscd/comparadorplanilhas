@@ -2,95 +2,91 @@ import streamlit as st
 import pandas as pd
 import difflib
 from io import BytesIO
+from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.utils import get_column_letter
-from openpyxl import load_workbook
 
-def comparar_resumido_explicito(texto1, texto2):
-    if pd.isna(texto1) or pd.isna(texto2):
-        return "Um dos textos está vazio"
-
-    d = difflib.Differ()
-    diff = list(d.compare(str(texto1).split(), str(texto2).split()))
-
-    removidos = sorted(set(x[2:] for x in diff if x.startswith("- ")))
-    adicionados = sorted(set(x[2:] for x in diff if x.startswith("+ ")))
-
-    if not removidos and not adicionados:
-        return "Nenhuma diferença encontrada"
-
-    resumo = ""
-    if removidos:
-        resumo += "Removido: " + ", ".join(removidos[:20])
-        if len(removidos) > 20:
-            resumo += ", ..."
-        resumo += " | "
-    if adicionados:
-        resumo += "Adicionado: " + ", ".join(adicionados[:20])
-        if len(adicionados) > 20:
-            resumo += ", ..."
-
-    return resumo
-
-def processar_excel(df, col1, col2):
-    df["Diferenças"] = df.apply(lambda row: comparar_resumido_explicito(row[col1], row[col2]), axis=1)
-
-    buffer = BytesIO()
-    df.to_excel(buffer, index=False)
-    buffer.seek(0)
-
-    wb = load_workbook(buffer)
-    ws = wb.active
-
-    for col in ws.columns:
-        col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = 50 
-        
-        for i, cell in enumerate(col):
-            if i == 0:
-                cell.fill = PatternFill(start_color="ededed", end_color="ededed", fill_type="solid")
-                cell.font = Font(bold=True)
-            else:
-                cell.alignment = Alignment(wrap_text=True, vertical='top')
-
-    buffer_final = BytesIO()
-    wb.save(buffer_final)
-    buffer_final.seek(0)
-    return buffer_final
-
-st.set_page_config(
-    page_title="Comparador de Planilhas",
-    page_icon="📊"
-)
-
+st.set_page_config(page_title="Comparador de Planilhas", page_icon="📊")
 st.title("Comparador de Planilhas")
-st.write("Faça upload de um arquivo Excel e selecione as colunas que deseja comparar.")
+st.markdown("Faça upload de duas planilhas para comparar os itens e gerar as diferenças.")
 
-uploaded_file = st.file_uploader(
-    label="Envie aqui sua planilha para comparar",
-    type=["xlsx", "xls"]
-)
+uploaded_file1 = st.file_uploader("Selecione a primeira planilha (base de referência)", type=["xlsx"])
+uploaded_file2 = st.file_uploader("Selecione a segunda planilha (para buscar similaridades)", type=["xlsx"])
 
-if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
-    st.write("Pré-visualização dos dados:")
-    st.dataframe(df.head())
+if uploaded_file1 and uploaded_file2:
+    planilha1 = pd.ExcelFile(uploaded_file1)
+    planilha2 = pd.ExcelFile(uploaded_file2)
 
-    colunas = df.columns.tolist()
-    st.write("Selecione as colunas que deseja comparar:")
+    aba1 = st.selectbox("Escolha a aba da primeira planilha", planilha1.sheet_names)
+    aba2 = st.selectbox("Escolha a aba da segunda planilha", planilha2.sheet_names)
 
-    col1 = st.selectbox("Coluna 1", colunas, key="col1")
-    col2 = st.selectbox("Coluna 2", colunas, key="col2")
+    df1 = planilha1.parse(aba1)
+    df2 = planilha2.parse(aba2)
 
-    if col1 and col2 and col1 != col2:
-        arquivo_processado = processar_excel(df, col1, col2)
+    st.subheader("Visualização da primeira planilha")
+    st.dataframe(df1)
+    st.subheader("Visualização da segunda planilha")
+    st.dataframe(df2)
 
-        st.success(f"Comparação concluída entre '{col1}' e '{col2}'.")
+    st.subheader("Configuração das colunas")
+    col1 = st.selectbox("Coluna da primeira planilha", df1.columns)
+    col2 = st.selectbox("Coluna da segunda planilha", df2.columns)
+
+    def encontrar_mais_similar(texto, lista_textos):
+        texto = str(texto)
+        lista_textos = [str(t) for t in lista_textos]
+
+        similar = difflib.get_close_matches(texto, lista_textos, n=1, cutoff=0.0)
+        if not similar:
+            return "Nenhum encontrado", "N/A"
+        mais_similar = similar[0]
+
+        d = difflib.Differ()
+        diff = list(d.compare(texto.split(), mais_similar.split()))
+        diffs = [x for x in diff if x.startswith("+ ") or x.startswith("- ")]
+        diff_text = "Nenhuma diferença" if not diffs else " | ".join(diffs)
+        return mais_similar, diff_text
+
+    if st.button("Iniciar Conversão"):
+        n = len(df1)
+        progresso_bar = st.progress(0)
+        progresso_text = st.empty()
+
+        resultados = []
+        for i, valor in enumerate(df1[col1]):
+            mais_similar, diff_text = encontrar_mais_similar(valor, df2[col2].tolist())
+            resultados.append((mais_similar, diff_text))
+
+            progresso_bar.progress((i + 1) / n)
+            progresso_text.text(f"Processando {i + 1} de {n} itens...")
+
+        df1["Mais Similar"], df1["Diferenças"] = zip(*resultados)
+
+        output = BytesIO()
+        df1.to_excel(output, index=False)
+        output.seek(0)
+
+        wb = load_workbook(output)
+        ws = wb.active
+
+        for col in ws.columns:
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = 50
+            for i, cell in enumerate(col):
+                if i == 0:
+                    cell.fill = PatternFill(start_color="ededed", end_color="ededed", fill_type="solid")
+                    cell.font = Font(bold=True)
+                else:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+
+        output_final = BytesIO()
+        wb.save(output_final)
+        output_final.seek(0)
+
+        st.success("Conversão concluída!")
         st.download_button(
-            label="📥 Baixar Diferenças.xlsx",
-            data=arquivo_processado,
-            file_name="Diferenças.xlsx",
+            label="Baixar planilha com diferenças",
+            data=output_final,
+            file_name="Comparacao_Resultados.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-    else:
-        st.warning("Selecione duas colunas diferentes para comparar.")
