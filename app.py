@@ -61,7 +61,10 @@ def processar_excel(df, col1, col2):
 st.title("Comparador de Requisitos Dinâmico")
 st.write("Faça upload de um arquivo Excel e selecione as colunas que deseja comparar.")
 
-uploaded_file = st.file_uploader("Upload do Excel", type=["xlsx"])
+uploaded_file = st.file_uploader(
+    label="Envie aqui sua planilha para comparar",
+    type=["xlsx", "xls"]
+)
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
