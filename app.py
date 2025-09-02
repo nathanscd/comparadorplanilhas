@@ -59,7 +59,7 @@ def processar_excel(df, col1, col2):
     return buffer_final
 
 st.set_page_config(
-    page_title="Comparador",
+    page_title="Comparador de Planilhas",
     page_icon="📊"
 )
 
