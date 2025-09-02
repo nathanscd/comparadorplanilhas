@@ -58,7 +58,13 @@ def processar_excel(df, col1, col2):
     buffer_final.seek(0)
     return buffer_final
 
-st.title("Comparador de Requisitos Dinâmico")
+st.set_page_config(
+    page_title="Comparador de Planilhas",  # título da aba
+    page_icon="📊",  # ícone da aba (pode ser emoji ou caminho para imagem .ico/.png)
+    layout="wide"    # opcional: pode ser "centered" ou "wide"
+)
+
+st.title("Comparador de Planilhas")
 st.write("Faça upload de um arquivo Excel e selecione as colunas que deseja comparar.")
 
 uploaded_file = st.file_uploader(
