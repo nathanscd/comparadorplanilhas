@@ -87,6 +87,6 @@ if uploaded_file1 and uploaded_file2:
         st.download_button(
             label="Baixar planilha com diferenças",
             data=output_final,
-            file_name="Comparacao_Resultados.xlsx",
+            file_name="Diferenças.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
