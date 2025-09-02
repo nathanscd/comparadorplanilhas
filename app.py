@@ -59,9 +59,8 @@ def processar_excel(df, col1, col2):
     return buffer_final
 
 st.set_page_config(
-    page_title="Comparador de Planilhas",  # título da aba
-    page_icon="📊",  # ícone da aba (pode ser emoji ou caminho para imagem .ico/.png)
-    layout="wide"    # opcional: pode ser "centered" ou "wide"
+    page_title="Comparador de Planilhas",
+    page_icon="📊"
 )
 
 st.title("Comparador de Planilhas")
