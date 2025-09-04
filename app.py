@@ -47,7 +47,7 @@ if uploaded_file1 and uploaded_file2:
         diff_text = "Nenhuma diferença" if not diffs else " | ".join(diffs)
         return mais_similar, diff_text
 
-    if st.button("Iniciar Conversão"):
+    if st.button("Iniciar Comparação"):
         n = len(df1)
         progresso_bar = st.progress(0)
         progresso_text = st.empty()
