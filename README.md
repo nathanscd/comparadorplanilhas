@@ -121,5 +121,5 @@ Sinta-se à vontade para usar, modificar e compartilhar.
 
 ## 👨‍💻 Autor
 
-Desenvolvido por **\Nathanael Secundo Cardoso** 🎯
+Desenvolvido por **Nathanael Secundo Cardoso** 🎯
 Estudante de Ciência da Computação | Apaixonado por automação e análise de dados.
