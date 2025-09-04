@@ -1,4 +1,3 @@
-````
 # 📊 Comparador de Planilhas
 
 Este projeto é uma aplicação **web interativa em Streamlit** para comparar duas planilhas do Excel (`.xlsx`) e identificar similaridades e diferenças entre colunas selecionadas.  
