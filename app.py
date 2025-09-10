@@ -9,107 +9,170 @@ from openpyxl.utils import get_column_letter
 
 st.set_page_config(page_title="Comparador de Planilhas", page_icon="📊")
 st.title("Comparador de Planilhas")
-st.markdown("Faça upload de duas planilhas para comparar os itens e gerar as diferenças.")
+st.markdown("Preencha o formulário inicial para configurar a comparação.")
 
-uploaded_file1 = st.file_uploader("Selecione a primeira planilha (base de referência)", type=["xlsx"])
-uploaded_file2 = st.file_uploader("Selecione a segunda planilha (para buscar similaridades)", type=["xlsx"])
+# === FORMULÁRIO INICIAL ===
+with st.form("config_form"):
+    n_planilhas = st.number_input("Quantas planilhas você deseja comparar?", min_value=1, max_value=5, value=1, step=1)
+    n_colunas = st.number_input("Quantas colunas devem ser comparadas em cada planilha?", min_value=1, max_value=5, value=1, step=1)
+    modo = None
+    if n_planilhas > 1:
+        modo = st.radio("Modo de comparação", ["Primeira planilha contra as outras", "Comparação cruzada entre todas"])
+    iniciar = st.form_submit_button("Continuar")
 
-if uploaded_file1 and uploaded_file2:
-    planilha1 = pd.ExcelFile(uploaded_file1)
-    planilha2 = pd.ExcelFile(uploaded_file2)
+if iniciar:
+    st.session_state["n_planilhas"] = n_planilhas
+    st.session_state["n_colunas"] = n_colunas
+    st.session_state["modo"] = modo
 
-    aba1 = st.selectbox("Escolha a aba da primeira planilha", planilha1.sheet_names)
-    aba2 = st.selectbox("Escolha a aba da segunda planilha", planilha2.sheet_names)
+if "n_planilhas" in st.session_state:
+    n_planilhas = st.session_state["n_planilhas"]
+    n_colunas = st.session_state["n_colunas"]
+    modo = st.session_state.get("modo")
 
-    df1 = planilha1.parse(aba1)
-    df2 = planilha2.parse(aba2)
+    st.subheader("Upload das planilhas")
+    arquivos = []
+    for i in range(n_planilhas):
+        uploaded = st.file_uploader(f"Selecione a planilha {i+1}", type=["xlsx"], key=f"file_{i}")
+        arquivos.append(uploaded)
 
-    st.subheader("Visualização da primeira planilha")
-    st.dataframe(df1)
-    st.subheader("Visualização da segunda planilha")
-    st.dataframe(df2)
+    if all(arquivos):
+        planilhas = [pd.ExcelFile(f) for f in arquivos]
 
-    st.subheader("Configuração das colunas")
-    col1 = st.selectbox("Coluna da primeira planilha", df1.columns)
-    col2 = st.selectbox("Coluna da segunda planilha", df2.columns)
+        abas = []
+        dfs = []
+        for i, p in enumerate(planilhas):
+            aba = st.selectbox(f"Escolha a aba da planilha {i+1}", p.sheet_names, key=f"aba_{i}")
+            abas.append(aba)
+            dfs.append(p.parse(aba))
 
-    def encontrar_mais_similar(texto, lista_textos):
-        texto = str(texto)
-        lista_textos = [str(t) for t in lista_textos]
+        st.subheader("Configuração das colunas")
+        colunas_escolhidas = []
+        for i, df in enumerate(dfs):
+            cols = []
+            for j in range(n_colunas):
+                col = st.selectbox(f"Coluna {j+1} da planilha {i+1}", df.columns, key=f"col_{i}_{j}")
+                cols.append(col)
+            colunas_escolhidas.append(cols)
 
-        similar = difflib.get_close_matches(texto, lista_textos, n=1, cutoff=0.0)
-        if not similar:
-            return "Nenhum encontrado", "N/A"
-        mais_similar = similar[0]
+        def encontrar_mais_similar(texto, lista_textos):
+            texto = str(texto)
+            lista_textos = [str(t) for t in lista_textos]
+            similar = difflib.get_close_matches(texto, lista_textos, n=1, cutoff=0.0)
+            if not similar:
+                return "Nenhum encontrado", "N/A"
+            mais_similar = similar[0]
 
-        d = difflib.Differ()
-        diff = list(d.compare(texto.split(), mais_similar.split()))
-        diffs = [x for x in diff if x.startswith("+ ") or x.startswith("- ")]
-        diff_text = "Nenhuma diferença" if not diffs else " | ".join(diffs)
-        return mais_similar, diff_text
+            d = difflib.Differ()
+            diff = list(d.compare(texto.split(), mais_similar.split()))
+            diffs = [x for x in diff if x.startswith("+ ") or x.startswith("- ")]
+            diff_text = "Nenhuma diferença" if not diffs else " | ".join(diffs)
+            return mais_similar, diff_text
 
-    if st.button("Iniciar Comparação"):
-        resultados = []
-        n = len(df1)
+        if st.button("Iniciar Comparação"):
+            resultados_finais = []
+            total_passos = 0
 
-        progresso_bar = st.progress(0)
-        progresso_text = st.empty() 
-
-        inicio = time.time()
-
-        for i, valor in enumerate(df1[col1].tolist()):
-            try:
-                similar, diff = encontrar_mais_similar(valor, df2[col2].tolist())
-            except Exception:
-                similar, diff = "Erro", "Erro"
-            resultados.append((similar, diff))
-
-            progresso_bar.progress((i + 1) / n)
-
-            tempo_passado = time.time() - inicio
-            media_por_item = tempo_passado / (i + 1)
-            itens_restantes = n - (i + 1)
-            tempo_estimado = itens_restantes * media_por_item
-
-            if tempo_estimado < 60:
-                tempo_str = f"{tempo_estimado:.1f} segundos restantes"
+            if n_planilhas == 1:
+                total_passos = len(dfs[0]) * n_colunas
+            elif modo == "Primeira planilha contra as outras":
+                total_passos = len(dfs[0]) * n_colunas * (n_planilhas - 1)
             else:
-                tempo_str = f"{tempo_estimado/60:.1f} minutos restantes"
+                for i in range(n_planilhas):
+                    for j in range(i + 1, n_planilhas):
+                        total_passos += len(dfs[i]) * n_colunas
 
-            progresso_text.markdown(
-                f"**Processando {i + 1} de {n} itens... | {tempo_str}**"
+            progresso_bar = st.progress(0)
+            progresso_text = st.empty()
+            progresso_atual = 0
+            inicio = time.time()
+
+            if n_planilhas == 1:
+                base_df = dfs[0].copy()
+                for c in colunas_escolhidas[0]:
+                    similares, diffs = [], []
+                    valores = base_df[c].tolist()
+                    for i, val in enumerate(valores):
+                        similar, diff = encontrar_mais_similar(val, valores)
+                        similares.append(similar)
+                        diffs.append(diff)
+                        progresso_atual += 1
+                        progresso_bar.progress(progresso_atual / total_passos)
+                        tempo_passado = time.time() - inicio
+                        tempo_estimado = (tempo_passado / progresso_atual) * (total_passos - progresso_atual)
+                        tempo_str = f"{tempo_estimado/60:.1f} minutos restantes" if tempo_estimado > 60 else f"{tempo_estimado:.1f} segundos restantes"
+                        progresso_text.markdown(f"**Processando {progresso_atual}/{total_passos} itens... | {tempo_str}**")
+                    base_df[f"Similar_{c}"] = similares
+                    base_df[f"Diferenças_{c}"] = diffs
+                resultados_finais.append(("Planilha Única", base_df))
+
+            elif modo == "Primeira planilha contra as outras":
+                base_df = dfs[0].copy()
+                for idx, df in enumerate(dfs[1:], start=2):
+                    for c in colunas_escolhidas[0]:
+                        similares, diffs = [], []
+                        for i, val in enumerate(base_df[c].tolist()):
+                            similar, diff = encontrar_mais_similar(val, df[colunas_escolhidas[idx-1][0]])
+                            similares.append(similar)
+                            diffs.append(diff)
+                            progresso_atual += 1
+                            progresso_bar.progress(progresso_atual / total_passos)
+                            tempo_passado = time.time() - inicio
+                            tempo_estimado = (tempo_passado / progresso_atual) * (total_passos - progresso_atual)
+                            tempo_str = f"{tempo_estimado/60:.1f} minutos restantes" if tempo_estimado > 60 else f"{tempo_estimado:.1f} segundos restantes"
+                            progresso_text.markdown(f"**Processando {progresso_atual}/{total_passos} itens... | {tempo_str}**")
+                        base_df[f"Similar_Planilha{idx}_{c}"] = similares
+                        base_df[f"Diferenças_Planilha{idx}_{c}"] = diffs
+                resultados_finais.append(("Planilha 1 vs Outras", base_df))
+
+            else:
+                for i, dfA in enumerate(dfs):
+                    for j, dfB in enumerate(dfs):
+                        if i < j:
+                            temp_df = dfA.copy()
+                            for c in colunas_escolhidas[i]:
+                                similares, diffs = [], []
+                                for val in temp_df[c].tolist():
+                                    similar, diff = encontrar_mais_similar(val, dfB[colunas_escolhidas[j][0]])
+                                    similares.append(similar)
+                                    diffs.append(diff)
+                                    progresso_atual += 1
+                                    progresso_bar.progress(progresso_atual / total_passos)
+                                    tempo_passado = time.time() - inicio
+                                    tempo_estimado = (tempo_passado / progresso_atual) * (total_passos - progresso_atual)
+                                    tempo_str = f"{tempo_estimado/60:.1f} minutos restantes" if tempo_estimado > 60 else f"{tempo_estimado:.1f} segundos restantes"
+                                    progresso_text.markdown(f"**Processando {progresso_atual}/{total_passos} itens... | {tempo_str}**")
+                                temp_df[f"Similar_Planilha{j+1}_{c}"] = similares
+                                temp_df[f"Diferenças_Planilha{j+1}_{c}"] = diffs
+                            resultados_finais.append((f"Planilha {i+1} vs {j+1}", temp_df))
+
+            # === Exportar com formatação ===
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                for nome, df in resultados_finais:
+                    df.to_excel(writer, sheet_name=nome[:31], index=False)
+            output.seek(0)
+
+            wb = load_workbook(output)
+            for ws in wb.worksheets:
+                for col in ws.columns:
+                    col_letter = get_column_letter(col[0].column)
+                    ws.column_dimensions[col_letter].width = 50
+                    for i, cell in enumerate(col):
+                        if i == 0:
+                            cell.fill = PatternFill(start_color="ededed", end_color="ededed", fill_type="solid")
+                            cell.font = Font(bold=True)
+                        else:
+                            cell.alignment = Alignment(wrap_text=True, vertical='top')
+
+            output_final = BytesIO()
+            wb.save(output_final)
+            output_final.seek(0)
+
+            st.success("✅ Comparação concluída com sucesso!")
+            st.download_button(
+                label="📥 Baixar planilha com diferenças",
+                data=output_final,
+                file_name="Diferenças.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-        if resultados:
-            df1["Mais Similar"], df1["Diferenças"] = zip(*resultados)
-        else:
-            df1["Mais Similar"], df1["Diferenças"] = [], []
-
-        output = BytesIO()
-        df1.to_excel(output, index=False)
-        output.seek(0)
-
-        wb = load_workbook(output)
-        ws = wb.active
-
-        for col in ws.columns:
-            col_letter = get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = 50
-            for i, cell in enumerate(col):
-                if i == 0:
-                    cell.fill = PatternFill(start_color="ededed", end_color="ededed", fill_type="solid")
-                    cell.font = Font(bold=True)
-                else:
-                    cell.alignment = Alignment(wrap_text=True, vertical='top')
-
-        output_final = BytesIO()
-        wb.save(output_final)
-        output_final.seek(0)
-
-        st.success("✅ Comparação concluída com sucesso!")
-        st.download_button(
-            label="📥 Baixar planilha com diferenças",
-            data=output_final,
-            file_name="Diferenças.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
