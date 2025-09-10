@@ -2,6 +2,8 @@
 
 Este projeto é uma aplicação **web interativa em Streamlit** para comparar uma ou várias planilhas do Excel (`.xlsx`) e identificar similaridades e diferenças entre colunas selecionadas.
 
+https://comparadordeplanilhas.streamlit.app/
+
 A aplicação permite:
 
 * Upload de uma ou mais planilhas em formato `.xlsx`.
@@ -83,6 +85,8 @@ A aplicação permite:
 ---
 
 ## 🖼️ Exemplo de Uso
+
+Com o aplicativo rodando localmente ou pelo site criado com Streamlit (https://comparadordeplanilhas.streamlit.app/):
 
 1. Preencha o formulário inicial informando:
 
