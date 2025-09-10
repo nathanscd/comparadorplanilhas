@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import difflib
+import time
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
@@ -48,15 +49,13 @@ if uploaded_file1 and uploaded_file2:
         return mais_similar, diff_text
 
     if st.button("Iniciar Comparação"):
-        n = len(df1)
-        progresso_bar = st.progress(0)
-        progresso_text = st.empty()
-
         resultados = []
         n = len(df1)
 
         progresso_bar = st.progress(0)
-        progresso_text = st.empty()
+        progresso_text = st.empty() 
+
+        inicio = time.time()
 
         for i, valor in enumerate(df1[col1].tolist()):
             try:
@@ -66,13 +65,25 @@ if uploaded_file1 and uploaded_file2:
             resultados.append((similar, diff))
 
             progresso_bar.progress((i + 1) / n)
-            progresso_text.text(f"Processando {i + 1} de {n} itens...")
+
+            tempo_passado = time.time() - inicio
+            media_por_item = tempo_passado / (i + 1)
+            itens_restantes = n - (i + 1)
+            tempo_estimado = itens_restantes * media_por_item
+
+            if tempo_estimado < 60:
+                tempo_str = f"{tempo_estimado:.1f} segundos restantes"
+            else:
+                tempo_str = f"{tempo_estimado/60:.1f} minutos restantes"
+
+            progresso_text.markdown(
+                f"**Processando {i + 1} de {n} itens... | {tempo_str}**"
+            )
 
         if resultados:
             df1["Mais Similar"], df1["Diferenças"] = zip(*resultados)
         else:
             df1["Mais Similar"], df1["Diferenças"] = [], []
-
 
         output = BytesIO()
         df1.to_excel(output, index=False)
@@ -95,9 +106,9 @@ if uploaded_file1 and uploaded_file2:
         wb.save(output_final)
         output_final.seek(0)
 
-        st.success("Conversão concluída!")
+        st.success("✅ Comparação concluída com sucesso!")
         st.download_button(
-            label="Baixar planilha com diferenças",
+            label="📥 Baixar planilha com diferenças",
             data=output_final,
             file_name="Diferenças.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
