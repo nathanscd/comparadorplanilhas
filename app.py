@@ -52,28 +52,26 @@ if uploaded_file1 and uploaded_file2:
         progresso_bar = st.progress(0)
         progresso_text = st.empty()
 
-        # Dentro do if st.button("Iniciar Conversão"):
-    resultados = []
-    n = len(df1)
+        resultados = []
+        n = len(df1)
 
-    progresso_bar = st.progress(0)
-    progresso_text = st.empty()
+        progresso_bar = st.progress(0)
+        progresso_text = st.empty()
 
-    for i, valor in enumerate(df1[col1].tolist()):
-        try:
-            similar, diff = encontrar_mais_similar(valor, df2[col2].tolist())
-        except Exception:
-            similar, diff = "Erro", "Erro"
-        resultados.append((similar, diff))
+        for i, valor in enumerate(df1[col1].tolist()):
+            try:
+                similar, diff = encontrar_mais_similar(valor, df2[col2].tolist())
+            except Exception:
+                similar, diff = "Erro", "Erro"
+            resultados.append((similar, diff))
 
-        progresso_bar.progress((i + 1) / n)
-        progresso_text.text(f"Processando {i + 1} de {n} itens...")
+            progresso_bar.progress((i + 1) / n)
+            progresso_text.text(f"Processando {i + 1} de {n} itens...")
 
-    # Garantir que resultados não esteja vazio
-    if resultados:
-        df1["Mais Similar"], df1["Diferenças"] = zip(*resultados)
-    else:
-        df1["Mais Similar"], df1["Diferenças"] = [], []
+        if resultados:
+            df1["Mais Similar"], df1["Diferenças"] = zip(*resultados)
+        else:
+            df1["Mais Similar"], df1["Diferenças"] = [], []
 
 
         output = BytesIO()
